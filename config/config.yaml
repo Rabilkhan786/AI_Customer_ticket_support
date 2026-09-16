@@ -1,0 +1,24 @@
+app:
+  name: "AI Support Ticket Intelligence"
+  api_host: "0.0.0.0"
+  api_port: 8000
+  ui_port: 8501
+
+data:
+  csv_path: "data/support_tickets.csv"
+  database_path: "data/support.db"
+
+llm:
+  provider: "groq"
+  temperature: 0.1
+
+query:
+  max_rows: 100
+
+anomaly:
+  iqr_multiplier: 1.5
+  unresolved_hours: 24
+
+logging:
+  level: "INFO"
+  file_path: "logs/app.log"
