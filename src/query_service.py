@@ -6,6 +6,7 @@ import sqlglot
 from sqlglot import exp
 
 from src.database import TABLE_NAME, execute_query
+from src.anomaly_service import detect_resolution_anomalies
 from src.llm import generate_sql
 
 
@@ -31,9 +32,29 @@ def validate_sql(sql: str) -> None:
                 f"Invalid table: {table.name}"
             )
 
+def is_resolution_anomaly_question(question: str) -> bool:
+    """Check whether the question asks about resolution-time anomalies."""
+
+    text = question.lower()
+
+    return "anomal" in text and "resolution" in text
+
 
 def answer_question(question: str) -> dict:
-    """Generate, validate, and execute SQL for a user question."""
+    """Answer a natural-language question."""
+
+    if is_resolution_anomaly_question(question):
+        anomalies = detect_resolution_anomalies()
+
+        return {
+            "question": question,
+            "sql": None,
+            "explanation": (
+                "Resolution-time anomalies were detected "
+                "using the IQR method."
+            ),
+            "data": anomalies.to_dict(orient="records"),
+        }
 
     llm_result = generate_sql(question)
 

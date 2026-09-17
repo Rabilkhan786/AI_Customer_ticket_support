@@ -1,4 +1,3 @@
-
 """Streamlit UI for the support ticket system."""
 
 import os
@@ -19,7 +18,6 @@ st.set_page_config(
     page_icon="🎫",
     layout="wide",
 )
-
 
 st.title("AI Support Ticket Intelligence")
 st.write(
@@ -54,25 +52,22 @@ if st.button("Ask"):
             response.raise_for_status()
             result = response.json()
 
-            if result["sql"] is None:
-                st.warning(result["explanation"])
+            st.subheader("Result")
 
+            data = result["data"]
+
+            if data:
+                st.dataframe(
+                    pd.DataFrame(data),
+                    use_container_width=True,
+                )
             else:
-                st.subheader("Result")
+                st.info("No matching records found.")
 
-                data = result["data"]
+            st.subheader("Explanation")
+            st.write(result["explanation"])
 
-                if data:
-                    st.dataframe(
-                        pd.DataFrame(data),
-                        use_container_width=True,
-                    )
-                else:
-                    st.info("No matching records found.")
-
-                st.subheader("Explanation")
-                st.write(result["explanation"])
-
+            if result["sql"]:
                 with st.expander("Generated SQL"):
                     st.code(
                         result["sql"],
