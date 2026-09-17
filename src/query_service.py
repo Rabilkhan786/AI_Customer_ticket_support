@@ -5,8 +5,8 @@ import logging
 import sqlglot
 from sqlglot import exp
 
-from src.database import TABLE_NAME, execute_query
 from src.anomaly_service import detect_resolution_anomalies
+from src.database import TABLE_NAME, execute_query
 from src.llm import generate_sql
 
 
@@ -31,6 +31,7 @@ def validate_sql(sql: str) -> None:
             raise ValueError(
                 f"Invalid table: {table.name}"
             )
+
 
 def is_resolution_anomaly_question(question: str) -> bool:
     """Check whether the question asks about resolution-time anomalies."""
