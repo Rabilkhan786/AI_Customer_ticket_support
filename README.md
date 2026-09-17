@@ -1,15 +1,20 @@
 # AI Support Ticket Intelligence
 
-AI-powered customer support ticket analysis system built for the AI Engineer assessment.
+AI-powered customer support ticket analysis system built for an AI Engineer assessment.
 
-The system can:
+The application lets users ask natural-language questions about support tickets, converts supported questions into SQL, validates the generated SQL, executes it on SQLite, and returns the result. It also detects ticket anomalies using deterministic rules.
 
-- Answer natural-language questions about support ticket data.
-- Convert user questions into SQL using an LLM.
-- Validate generated SQL before execution.
-- Detect abnormal resolution times.
-- Detect unresolved High/Critical tickets older than 24 hours.
-- Expose the functionality through FastAPI and Streamlit.
+## Features
+
+- CSV ingestion into SQLite
+- Natural-language to SQL using Groq
+- SQL validation with SQLGlot
+- Resolution-time anomaly detection using IQR
+- High/Critical unresolved ticket detection after 24 hours
+- FastAPI REST API
+- Streamlit UI
+- Docker Compose setup
+- Basic automated tests
 
 ## Architecture
 
@@ -19,58 +24,76 @@ User
 Streamlit UI
   ↓
 FastAPI
-  ↓
-┌─────────────────────┬─────────────────────┐
-│                     │                     │
-Query Service         Anomaly Service
-│                     │
-↓                     │
-Groq LLM              │
-│                     │
-↓                     │
-SQL Generation        │
-│                     │
-↓                     │
-SQL Validation        │
-│                     │
-└──────────┬──────────┘
-           ↓
-         SQLite
-           ↓
-   support_tickets.csv
+  ├── /query
+  │     ↓
+  │  Query Service
+  │     ↓
+  │  Groq LLM → SQL → SQLGlot validation → SQLite
+  │
+  └── /anomalies
+        ↓
+     Anomaly Service
+        ↓
+     IQR + priority/age rules → SQLite
 ```
 
-### Query Flow
+The LLM is used for natural-language SQL generation. Anomaly decisions are handled by deterministic logic so the results remain consistent and explainable.
+
+## Tech Stack
+
+- Python 3.11
+- FastAPI
+- Streamlit
+- SQLite
+- Pandas
+- Groq LLM
+- SQLGlot
+- Pytest
+- Docker Compose
+
+## API Endpoints
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| `GET` | `/health` | Check API health |
+| `POST` | `/query` | Ask a natural-language question |
+| `GET` | `/anomalies` | Return detected anomalies |
+
+Swagger documentation:
 
 ```text
-Natural-language question
-        ↓
-LLM generates SQL
-        ↓
-SQL is validated
-        ↓
-SQLite executes query
-        ↓
-Result returned to user
+http://localhost:8000/docs
 ```
 
-The LLM does not calculate the final answer itself. It generates SQL, while SQLite produces the actual result.
+## Example Questions
+
+```text
+How many tickets are currently open?
+Which agent resolved the most tickets?
+What is the average customer rating for Technical tickets?
+Show Critical tickets that were not resolved within 12 hours.
+Are there any anomalies in resolution times?
+```
+
+Example:
+
+```text
+Question: How many tickets are currently open?
+Result: 111
+```
 
 ## Anomaly Detection
 
-The system detects two anomaly types.
+### Long Resolution Times
 
-### Long Resolution Time
-
-Resolved tickets are checked using the IQR method:
+Resolved tickets are checked using the IQR rule:
 
 ```text
 IQR = Q3 - Q1
-
-Upper Limit = Q3 + 1.5 × IQR
+Upper Limit = Q3 + (1.5 × IQR)
 ```
 
-Tickets above the upper limit are flagged.
+Tickets above the upper limit are flagged as long-resolution-time anomalies.
 
 ### Unresolved Priority Tickets
 
@@ -82,80 +105,18 @@ Status != Resolved
 Ticket age > 24 hours
 ```
 
-Because the dataset is historical, ticket age is calculated relative to the latest timestamp in the dataset.
+Because the supplied dataset is historical, ticket age is calculated relative to the latest ticket timestamp in the dataset.
 
-## Tech Stack
+## Run the Project
 
-| Component | Technology |
-|---|---|
-| Language | Python |
-| Data Processing | Pandas |
-| Database | SQLite |
-| LLM | Groq |
-| SQL Validation | SQLGlot |
-| API | FastAPI |
-| UI | Streamlit |
-| Testing | Pytest |
-| Logging | Python Logging |
-| Containerization | Docker Compose |
-
-## API Endpoints
-
-```text
-GET  /health
-POST /query
-GET  /anomalies
-```
-
-FastAPI Swagger documentation:
-
-```text
-http://localhost:8000/docs
-```
-
-## Example Query
-
-Question:
-
-```text
-How many tickets are currently open?
-```
-
-Generated SQL:
-
-```sql
-SELECT COUNT(*) AS open_ticket_count
-FROM support_tickets
-WHERE status = 'Open';
-```
-
-Result:
-
-```json
-{
-  "open_ticket_count": 111
-}
-```
-
-Example complex question:
-
-```text
-Among High and Critical priority tickets,
-which agent resolved the most tickets,
-and what was that agent's average resolution time
-and average customer rating?
-```
-
-## Running the Project
-
-Create a `.env` file:
+Create a `.env` file from `.env.example`:
 
 ```env
 GROQ_API_KEY=your_groq_api_key
-GROQ_MODEL=your_model_name
+GROQ_MODEL=openai/gpt-oss-20b
 ```
 
-Start the complete application:
+Start the application:
 
 ```bash
 docker compose up --build
@@ -164,32 +125,41 @@ docker compose up --build
 Open:
 
 ```text
-Streamlit UI:
-http://localhost:8501
-
-Swagger API:
-http://localhost:8000/docs
+Streamlit UI: http://localhost:8501
+Swagger API:   http://localhost:8000/docs
 ```
+
+Stop the application:
+
+```bash
+docker compose down
+```
+
+## Tests
+
+Run:
+
+```bash
+uv run python -m pytest
+```
+
+The tests cover SQL validation, unsafe-query rejection, anomaly detection, and the health endpoint.
 
 ## Project Structure
 
 ```text
 AI_Customer_ticket_support/
-│
+├── config/
+│   └── config.yaml
+├── data/
+│   └── support_tickets.csv
 ├── src/
 │   ├── config.py
-│   ├── logging_config.py
 │   ├── database.py
 │   ├── llm.py
 │   ├── query_service.py
-│   └── anomaly_service.py
-│
-├── config/
-│   └── config.yaml
-│
-├── data/
-│   └── support_tickets.csv
-│
+│   ├── anomaly_service.py
+│   └── logging_config.py
 ├── tests/
 ├── main.py
 ├── ui.py
@@ -199,32 +169,9 @@ AI_Customer_ticket_support/
 └── README.md
 ```
 
-## Known Limitations
+## Limitations
 
-The system only answers questions supported by the provided dataset schema.
-
-For example:
-
-```text
-Which city has the most tickets?
-```
-
-cannot be answered because the dataset does not contain location information.
-
-LLM-generated SQL may also be incorrect for highly ambiguous questions, so generated queries are validated before execution.
-
-## Summary
-
-This project focuses on four main requirements:
-
-```text
-CSV → Queryable Database
-          ↓
-Natural Language → SQL
-          ↓
-Anomaly Detection
-          ↓
-FastAPI + Streamlit
-```
-
-The architecture is intentionally simple so the system remains easy to run, test, and explain.
+- Questions must be answerable from the provided ticket schema.
+- LLM-generated SQL can be imperfect for ambiguous questions, so every generated query is validated before execution.
+- Relative date questions such as `this week` use the current date when generated by the LLM; historical data may therefore return no matching records.
+- Authentication and production deployment are outside the scope of this assessment.
